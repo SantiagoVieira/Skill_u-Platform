@@ -1,63 +1,61 @@
 "use client";
 
 import { useState } from "react";
-
-interface MetaData {
-  title:      string;
-  desc:       string;
-  subject:    string;
-  cat:        string;
-  university: string;
-  price:      string;
-}
+import { supabase } from "@/lib/supabase";
+import { SUBJECTS } from "@/types/material";
 
 interface Props {
-  onClose:  () => void;
-  onSubmit: (data: MetaData) => void;
+  onClose: () => void;
+  onSaved: (id: string) => void;
 }
 
-export function PublishMetaModal({ onClose, onSubmit }: Props) {
-  const [form, setForm] = useState<MetaData>({
-    title: "", desc: "", subject: "", cat: "pub", university: "", price: "",
-  });
+export function PublishMetaModal({ onClose, onSaved }: Props) {
+  const [title,   setTitle]   = useState("");
+  const [desc,    setDesc]    = useState("");
+  const [subject, setSubject] = useState<string>(SUBJECTS[0]); // ← tipo explícito
+  const [price,   setPrice]   = useState("0");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
 
-  function set(key: keyof MetaData) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm((prev) => ({ ...prev, [key]: e.target.value }));
-  }
+  async function handleSave() {
+    if (!title.trim()) { setError("El título es obligatorio"); return; }
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-  function handleSubmit() {
-    if (!form.title.trim()) return;
-    onSubmit(form);
+    const { data, error: err } = await supabase
+      .from("materials")
+      .insert({
+        user_id:     session.user.id,
+        title:       title.trim(),
+        description: desc.trim(),
+        subject,
+        price:       parseFloat(price) || 0,
+        is_visible:  false,
+      })
+      .select("id")
+      .single();
+
+    if (err) { setError(err.message); setLoading(false); return; }
+    onSaved(data.id);
   }
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div className="modal-header">
-          <span className="modal-title">Publicar material académico</span>
+          <span className="modal-title">Nueva publicación</span>
           <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
         <div className="modal-body">
-          {/* Steps */}
-          <div>
-            <div className="step-row">
-              <div className="step-bar done" />
-              <div className="step-bar done" />
-              <div className="step-bar" />
-            </div>
-            <p className="step-meta">Paso 2 de 3 — Datos del material (HU-06)</p>
-          </div>
-
           <div className="field-group">
-            <label className="field-label">Título del material *</label>
+            <label className="field-label">Título *</label>
             <input
               className="field-input"
-              type="text"
-              value={form.title}
-              onChange={set("title")}
-              placeholder="Ej: Apuntes de Cálculo Diferencial — Semestre 2024-1"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej: Apuntes Cálculo Diferencial 2024-1"
             />
           </div>
 
@@ -66,42 +64,51 @@ export function PublishMetaModal({ onClose, onSubmit }: Props) {
             <textarea
               className="field-textarea"
               rows={3}
-              value={form.desc}
-              onChange={set("desc")}
-              placeholder="Describe brevemente el contenido del material..."
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="Describe brevemente el contenido..."
             />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div className="field-group">
               <label className="field-label">Materia</label>
-              <input className="field-input" type="text" value={form.subject} onChange={set("subject")} placeholder="Cálculo Diferencial" />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Categoría</label>
               <div className="select-wrap">
-                <select className="field-select" value={form.cat} onChange={set("cat")}>
-                  <option value="pub">Publicación del material</option>
-                  <option value="bus">Búsqueda del material</option>
-                  <option value="rec">Recursos</option>
+                <select
+                  className="field-select"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)} 
+                >
+                  {SUBJECTS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </div>
             </div>
             <div className="field-group">
-              <label className="field-label">Universidad</label>
-              <input className="field-input" type="text" value={form.university} onChange={set("university")} placeholder="Universidad Nacional" />
-            </div>
-            <div className="field-group">
               <label className="field-label">Precio (COP)</label>
-              <input className="field-input" type="number" value={form.price} onChange={set("price")} placeholder="0 = gratis" min={0} />
+              <input
+                className="field-input"
+                type="number"
+                min={0}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0 = gratis"
+              />
             </div>
           </div>
+
+          {error && <p className="auth-error">{error}</p>}
+
+          <p style={{ fontSize: 11, color: "var(--gray-400)", lineHeight: 1.5 }}>
+            💡 La publicación quedará guardada pero no será visible hasta que subas el archivo.
+          </p>
         </div>
 
         <div className="modal-footer">
           <button className="modal-btn-cancel" onClick={onClose}>Cancelar</button>
-          <button className="modal-btn-submit" onClick={handleSubmit}>
-            Guardar y continuar →
+          <button className="modal-btn-submit" onClick={handleSave} disabled={loading}>
+            {loading ? "Guardando…" : "Guardar publicación →"}
           </button>
         </div>
       </div>

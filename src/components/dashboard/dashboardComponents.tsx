@@ -1,28 +1,49 @@
 "use client";
 
-import { CATEGORY_MAP, TYPE_THUMB_CLS } from "@/types/material";
+import { SUBJECTS, FILE_TYPE_THUMB } from "@/types/material";
 import type { Material } from "@/types/material";
 
 // ── Topbar ────────────────────────────────────────────────
 export function Topbar({
   title,
+  userName,
+  isSeller,
+  onSignOut,
+  onWantSell,
   onPublishData,
   onUploadFile,
 }: {
-  title: string;
+  title:         string;
+  userName:      string;
+  isSeller:      boolean;
+  onSignOut:     () => void;
+  onWantSell:    () => void;
   onPublishData: () => void;
-  onUploadFile: () => void;
+  onUploadFile:  () => void;
 }) {
   return (
     <header className="topbar">
       <span className="topbar-title">{title}</span>
       <div className="topbar-actions">
-        <button className="btn-ghost" onClick={onPublishData}>
-          Publicar datos
-        </button>
-        <button className="btn-orange-sm" onClick={onUploadFile}>
-          <PlusIcon />
-          Subir archivo
+        <span className="topbar-user">{userName}</span>
+
+        {!isSeller ? (
+          <button className="btn-want-sell" onClick={onWantSell}>
+            ¿Quieres vender?
+          </button>
+        ) : (
+          <>
+            <button className="btn-ghost" onClick={onPublishData}>
+              Publicar datos
+            </button>
+            <button className="btn-orange-sm" onClick={onUploadFile}>
+              <PlusIcon /> Subir archivo
+            </button>
+          </>
+        )}
+
+        <button className="btn-signout" onClick={onSignOut}>
+          Salir
         </button>
       </div>
     </header>
@@ -36,16 +57,16 @@ export function StatsGrid({
   downloads,
   categories,
 }: {
-  total: number;
-  published: number;
-  downloads: number;
+  total:      number;
+  published:  number;
+  downloads:  number;
   categories: number;
 }) {
   const cards = [
-    { label: "Total materiales", value: total,      sub: "En tu biblioteca"   },
+    { label: "Total materiales", value: total,      sub: "En la plataforma"    },
     { label: "Publicados",       value: published,   sub: "Visibles para todos" },
-    { label: "Descargas",        value: downloads,   sub: "Este mes"           },
-    { label: "Categorías",       value: categories,  sub: "Temas activos"      },
+    { label: "Descargas",        value: downloads,   sub: "Este mes"            },
+    { label: "Materias",         value: categories,  sub: "Temas activos"       },
   ];
   return (
     <div className="stats-grid">
@@ -60,20 +81,20 @@ export function StatsGrid({
   );
 }
 
-// ── SearchFilters (HU-10) ─────────────────────────────────
+// ── SearchFilters ─────────────────────────────────────────
 export function SearchFilters({
   search,
   onSearch,
-  filterCat,
-  onFilterCat,
+  filterSubj,
+  onFilterSubj,
   filterType,
   onFilterType,
 }: {
-  search: string;
-  onSearch: (v: string) => void;
-  filterCat: string;
-  onFilterCat: (v: string) => void;
-  filterType: string;
+  search:       string;
+  onSearch:     (v: string) => void;
+  filterSubj:   string;
+  onFilterSubj: (v: string) => void;
+  filterType:   string;
   onFilterType: (v: string) => void;
 }) {
   return (
@@ -88,20 +109,20 @@ export function SearchFilters({
           type="text"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder="Buscar material por palabra clave..."
+          placeholder="Buscar por título o materia..."
         />
       </div>
 
       <div className="select-wrap">
         <select
           className="filter-select"
-          value={filterCat}
-          onChange={(e) => onFilterCat(e.target.value)}
+          value={filterSubj}
+          onChange={(e) => onFilterSubj(e.target.value)}
         >
-          <option value="">Todas las categorías</option>
-          <option value="pub">Publicación del material</option>
-          <option value="bus">Búsqueda del material</option>
-          <option value="rec">Recursos</option>
+          <option value="">Todas las materias</option>
+          {SUBJECTS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
         </select>
       </div>
 
@@ -128,9 +149,9 @@ export function MaterialGrid({
   selectedId,
   onSelect,
 }: {
-  materials: Material[];
-  selectedId: number | null;
-  onSelect: (id: number) => void;
+  materials:  Material[];
+  selectedId: string | null;
+  onSelect:   (id: string) => void;
 }) {
   if (!materials.length) {
     return (
@@ -147,84 +168,40 @@ export function MaterialGrid({
   return (
     <div className="materials-grid">
       {materials.map((m) => {
-        const cat = CATEGORY_MAP[m.cat];
+        const thumbCls = FILE_TYPE_THUMB[m.file_type ?? "PDF"] ?? "thumb-pdf";
         return (
           <div
             key={m.id}
             className={`mat-card ${selectedId === m.id ? "selected" : ""}`}
             onClick={() => onSelect(m.id)}
           >
-            <div className={`mat-thumb ${TYPE_THUMB_CLS[m.type]}`}>
-              <TypeIcon type={m.type} />
+            <div className={`mat-thumb ${thumbCls}`}>
+              <TypeIcon type={m.file_type ?? "PDF"} />
             </div>
-            <span className={`badge ${cat.cls}`}>{cat.label}</span>
+
+            <span className="badge badge-subj">{m.subject ?? "—"}</span>
             <p className="mat-title">{m.title}</p>
+
             <div className="mat-meta">
-              <UserIcon /> {m.author}
-              &nbsp;·&nbsp;
-              <DownIcon /> {m.downloads}
+              <UserIcon /> {m.author ?? "Anónimo"}
+              {m.price > 0 && (
+                <>
+                  &nbsp;·&nbsp;
+                  <span style={{ color: "var(--orange)", fontWeight: 500 }}>
+                    ${m.price.toLocaleString("es-CO")}
+                  </span>
+                </>
+              )}
+              {m.price === 0 && (
+                <>
+                  &nbsp;·&nbsp;
+                  <span style={{ color: "#16a34a", fontWeight: 500 }}>Gratis</span>
+                </>
+              )}
             </div>
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// ── DetailPanel (HU-11) ───────────────────────────────────
-export function DetailPanel({
-  material: m,
-  onClose,
-}: {
-  material: Material;
-  onClose: () => void;
-}) {
-  const cat = CATEGORY_MAP[m.cat];
-  const rows: [string, string][] = [
-    ["Tipo de archivo", m.type],
-    ["Tamaño",          m.size],
-    ["Materia",         m.subject],
-    ["Universidad",     m.uni],
-    ["Publicado",       m.date],
-    ["Descargas",       String(m.downloads)],
-  ];
-
-  return (
-    <div className="detail-panel">
-      <div className="detail-top">
-        <div>
-          <span className={`badge ${cat.cls}`}>{cat.label}</span>
-          <h3 className="detail-title">{m.title}</h3>
-          <p className="detail-author">Por {m.author}</p>
-        </div>
-        <button className="detail-close" onClick={onClose} aria-label="Cerrar">
-          <svg viewBox="0 0 24 24">
-            <line x1="18" y1="6"  x2="6"  y2="18" />
-            <line x1="6"  y1="6"  x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="detail-sep" />
-
-      {rows.map(([label, value]) => (
-        <div key={label} className="detail-row">
-          <span className="detail-row-lbl">{label}</span>
-          <span className="detail-row-val">{value}</span>
-        </div>
-      ))}
-
-      <div className="detail-sep" />
-      <p className="detail-desc">{m.desc}</p>
-
-      <button className="btn-download">
-        <svg viewBox="0 0 24 24">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-        Descargar material
-      </button>
     </div>
   );
 }
@@ -247,28 +224,12 @@ function PlusIcon() {
 function UserIcon() {
   return (
     <svg
-      width="11" height="11"
-      viewBox="0 0 24 24"
+      width="11" height="11" viewBox="0 0 24 24"
       fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
     >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-    </svg>
-  );
-}
-
-function DownIcon() {
-  return (
-    <svg
-      width="11" height="11"
-      viewBox="0 0 24 24"
-      fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   );
 }
@@ -291,7 +252,6 @@ function TypeIcon({ type }: { type: string }) {
       </svg>
     );
   }
-  // PDF / DOC
   return (
     <svg viewBox="0 0 24 24">
       <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />

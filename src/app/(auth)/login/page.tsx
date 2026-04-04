@@ -1,15 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthLeft } from "@/components/auth/AuthLeft";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
 
-  function handleSubmit(e: React.FormEvent) {
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [error,    setError]    = useState("");
+  const [loading,  setLoading]  = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: connect to auth API
+    setError("");
+    setLoading(true);
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      setError(
+        error.message === "Invalid login credentials"
+          ? "Correo o contraseña incorrectos."
+          : error.message
+      );
+      setLoading(false);
+      return;
+    }
+
     router.push("/materiales");
   }
 
@@ -46,6 +67,8 @@ export default function LoginPage() {
               placeholder="tu@universidad.edu.co"
               autoComplete="email"
               required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
@@ -60,15 +83,19 @@ export default function LoginPage() {
               placeholder="••••••••"
               autoComplete="current-password"
               required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+
+          {error && <p className="auth-error">{error}</p>}
 
           <Link href="#" className="auth-forgot">
             ¿Olvidaste tu contraseña?
           </Link>
 
-          <button type="submit" className="btn-primary">
-            Iniciar sesión
+          <button type="submit" className="btn-primary" disabled={loading}>
+            {loading ? "Ingresando…" : "Iniciar sesión"}
           </button>
 
           <div className="divider">
