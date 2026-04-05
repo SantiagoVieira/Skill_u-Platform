@@ -4,12 +4,14 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useUser } from "@/lib/UserContext";
-import { Toast }               from "@/components/ui/Toast";
-import { PublishMetaModal }    from "@/components/dashboard/PublishMetaModal";
-import { UploadFileModal }     from "@/components/dashboard/UploadFileModal";
-import { EditMaterialModal }   from "@/components/dashboard/EditMaterialModal";
-import { FILE_TYPE_THUMB }     from "@/types/material";
-import type { Material }       from "@/types/material";
+import { Toast }             from "@/components/ui/Toast";
+import { ConfirmModal }      from "@/components/ui/ConfirmModal";
+import { ConfigModal }       from "@/components/dashboard/ConfigModal";
+import { PublishMetaModal }  from "@/components/dashboard/PublishMetaModal";
+import { UploadFileModal }   from "@/components/dashboard/UploadFileModal";
+import { EditMaterialModal } from "@/components/dashboard/EditMaterialModal";
+import { FILE_TYPE_THUMB }   from "@/types/material";
+import type { Material }     from "@/types/material";
 
 export default function MisPublicacionesPage() {
   const router = useRouter();
@@ -21,7 +23,16 @@ export default function MisPublicacionesPage() {
   const [toast,       setToast]       = useState("");
   const [showPublish, setShowPublish] = useState(false);
   const [showUpload,  setShowUpload]  = useState(false);
+  const [showConfig,  setShowConfig]  = useState(false);
   const [editMat,     setEditMat]     = useState<Material | null>(null);
+  const [confirmId,   setConfirmId]   = useState<string | null>(null);
+
+  // Escuchar evento del sidebar para abrir config
+  useEffect(() => {
+    const handler = () => setShowConfig(true);
+    window.addEventListener("open-config", handler);
+    return () => window.removeEventListener("open-config", handler);
+  }, []);
 
   useEffect(() => {
     if (profileLoading) return;
@@ -47,25 +58,25 @@ export default function MisPublicacionesPage() {
 
   async function toggleVisibility(mat: Material) {
     if (!mat.file_url && !mat.is_visible) {
-      showToast("⚠️ Sube un archivo antes de hacer visible este material");
+      showToastMsg("⚠️ Sube un archivo antes de hacer visible este material");
       return;
     }
     await supabase
       .from("materials")
       .update({ is_visible: !mat.is_visible })
       .eq("id", mat.id);
-    showToast(mat.is_visible ? "Material ocultado" : "Material visible");
+    showToastMsg(mat.is_visible ? "Material ocultado" : "Material visible");
     loadMaterials();
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Seguro que quieres eliminar este material? Esta acción no se puede deshacer.")) return;
     await supabase.from("materials").delete().eq("id", id);
-    showToast("Material eliminado");
+    showToastMsg("Material eliminado");
+    setConfirmId(null);
     loadMaterials();
   }
 
-  function showToast(msg: string) {
+  function showToastMsg(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 3200);
   }
@@ -102,7 +113,6 @@ export default function MisPublicacionesPage() {
       </header>
 
       <div className="dash-content">
-
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           {[
             { label: "Total",       value: stats.total,      sub: "publicaciones" },
@@ -156,25 +166,34 @@ export default function MisPublicacionesPage() {
             <MyMaterialRow
               key={m.id}
               material={m}
-              onEdit={()    => setEditMat(m)}
+              onEdit={()   => setEditMat(m)}
               onToggle={()  => toggleVisibility(m)}
-              onDelete={()  => handleDelete(m.id)}
+              onDelete={()  => setConfirmId(m.id)}
             />
           ))}
         </div>
       </div>
 
+      {/* ── Modales ── */}
       {showPublish && (
         <PublishMetaModal
           onClose={() => setShowPublish(false)}
-          onSaved={() => { setShowPublish(false); showToast("Publicación creada. Ahora sube el archivo."); loadMaterials(); }}
+          onSaved={() => {
+            setShowPublish(false);
+            showToastMsg("Publicación creada. Ahora sube el archivo.");
+            loadMaterials();
+          }}
         />
       )}
 
       {showUpload && (
         <UploadFileModal
           onClose={() => setShowUpload(false)}
-          onUploaded={() => { setShowUpload(false); showToast("¡Archivo publicado!"); loadMaterials(); }}
+          onUploaded={() => {
+            setShowUpload(false);
+            showToastMsg("¡Archivo publicado!");
+            loadMaterials();
+          }}
         />
       )}
 
@@ -182,16 +201,31 @@ export default function MisPublicacionesPage() {
         <EditMaterialModal
           material={editMat}
           onClose={() => setEditMat(null)}
-          onSaved={() => { setEditMat(null); showToast("Material actualizado"); loadMaterials(); }}
+          onSaved={() => {
+            setEditMat(null);
+            showToastMsg("Material actualizado");
+            loadMaterials();
+          }}
         />
       )}
 
-      {toast && <Toast message={toast} />}
+      {confirmId && (
+        <ConfirmModal
+          title="Eliminar material"
+          message="¿Seguro que quieres eliminar este material? Esta acción no se puede deshacer."
+          confirmLabel="Sí, eliminar"
+          onConfirm={() => handleDelete(confirmId)}
+          onCancel={() => setConfirmId(null)}
+        />
+      )}
+
+      {showConfig && <ConfigModal onClose={() => setShowConfig(false)} />}
+      {toast      && <Toast message={toast} />}
     </>
   );
 }
 
-// ── Fila ─────────────────────────────────────────────────
+// ── Fila de material ──────────────────────────────────────
 function MyMaterialRow({ material: m, onEdit, onToggle, onDelete }: {
   material: Material;
   onEdit:   () => void;
@@ -222,7 +256,10 @@ function MyMaterialRow({ material: m, onEdit, onToggle, onDelete }: {
           </p>
           <span className="badge badge-subj">{m.subject ?? "—"}</span>
           {sinArchivo && (
-            <span style={{ fontSize: 10, background: "#fef9c3", color: "#854d0e", borderRadius: 4, padding: "2px 6px", fontWeight: 600 }}>
+            <span style={{
+              fontSize: 10, background: "#fef9c3", color: "#854d0e",
+              borderRadius: 4, padding: "2px 6px", fontWeight: 600,
+            }}>
               Sin archivo
             </span>
           )}
@@ -263,6 +300,7 @@ function MyMaterialRow({ material: m, onEdit, onToggle, onDelete }: {
   );
 }
 
+// ── Botón de acción ───────────────────────────────────────
 function ActionBtn({ onClick, title, color, children, disabled }: {
   onClick:   () => void;
   title:     string;
@@ -291,10 +329,12 @@ function ActionBtn({ onClick, title, color, children, disabled }: {
   );
 }
 
+// ── Iconos ────────────────────────────────────────────────
 function PlusIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <line x1="12" y1="5"  x2="12" y2="19" />
       <line x1="5"  y1="12" x2="19" y2="12" />
     </svg>
   );
@@ -309,7 +349,8 @@ function FileIcon() {
 }
 function EditIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
@@ -317,7 +358,8 @@ function EditIcon() {
 }
 function EyeIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -325,7 +367,8 @@ function EyeIcon() {
 }
 function EyeOffIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
       <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
       <line x1="1" y1="1" x2="23" y2="23" />
@@ -334,7 +377,8 @@ function EyeOffIcon() {
 }
 function TrashIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6" /><path d="M14 11v6" />

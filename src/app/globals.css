@@ -935,3 +935,30 @@ body {
   border: none;
   font-family: "DM Sans", sans-serif;
 }
+
+.password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrap .field-input {
+  padding-right: 40px;
+}
+
+.password-eye {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  display: flex;
+  align-items: center;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.password-eye:hover {
+  color: var(--gray-600);
+}
