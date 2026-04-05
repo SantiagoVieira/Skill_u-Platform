@@ -336,10 +336,11 @@ body {
   width: 42%;
   min-width: 300px;
   background: var(--black);
-  padding: 48px 44px;
+  padding: 36px 44px 48px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 24px;
   position: relative;
   overflow: hidden;
 }
@@ -366,30 +367,20 @@ body {
   pointer-events: none;
 }
 
+/* ─── Logo (auth panel izquierdo) ────────────────────── */
 .auth-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: block;
   position: relative;
   z-index: 1;
+  width: 200px;
+  height: 120px;
+  background: url('/logo.png') no-repeat left center;
+  background-size: contain;
 }
 
-.auth-logo-icon {
-  width: 36px; height: 36px;
-  background: var(--orange);
-  border-radius: 9px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-
-.auth-logo-name {
-  font-family: "Syne", sans-serif;
-  font-weight: 800;
-  font-size: 22px;
-  color: var(--white);
-  letter-spacing: -0.5px;
-}
-.auth-logo-name span { color: var(--orange); }
+/* Ocultar elementos hijos si existen en el markup */
+.auth-logo-icon,
+.auth-logo-name { display: none; }
 
 .auth-left-content { position: relative; z-index: 1; }
 
@@ -575,28 +566,20 @@ body {
   border-bottom: 1px solid var(--gray-200);
 }
 
+/* ─── Logo (sidebar) ─────────────────────────────────── */
 .sidebar-logo {
-  display: flex;
+  display: block;
+  width: 120px;
+  height: 120px;
+  justify-content: center;
   align-items: center;
-  gap: 9px;
+  background: url('/logo.png') no-repeat left center;
+  background-size: contain;
 }
 
-.sidebar-logo-icon {
-  width: 30px; height: 30px;
-  background: var(--orange);
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-
-.sidebar-logo-name {
-  font-family: "Syne", sans-serif;
-  font-weight: 800;
-  font-size: 17px;
-  color: var(--gray-900);
-  letter-spacing: -0.4px;
-}
-.sidebar-logo-name span { color: var(--orange); }
+/* Ocultar elementos hijos si existen en el markup */
+.sidebar-logo-icon,
+.sidebar-logo-name { display: none; }
 
 .sidebar-nav {
   flex: 1;
@@ -810,7 +793,7 @@ body {
 }
 .empty-state svg { width: 36px; height: 36px; stroke: var(--gray-200); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; display: block; margin: 0 auto 12px; }
 
-/* ── Detail panel (HU-11) ── */
+/* ── Detail panel ── */
 .detail-panel {
   background: var(--white);
   border: 1px solid var(--gray-200);
@@ -846,7 +829,7 @@ body {
 .btn-download:hover { background: var(--orange-dark); }
 .btn-download svg { width: 15px; height: 15px; stroke: white; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-/* ── Drop zone (HU-07) ── */
+/* ── Drop zone ── */
 .drop-zone {
   border: 1.5px dashed var(--gray-300);
   border-radius: var(--radius-lg);
@@ -892,6 +875,7 @@ body {
   .materials-grid  { grid-template-columns: 1fr; }
 }
 
+/* ─── Misc ───────────────────────────────────────────── */
 .auth-error {
   color: #ef4444;
   font-size: 0.8rem;
@@ -914,7 +898,7 @@ body {
 .topbar-user {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--gray-500);
 }
 
 .btn-signout {
@@ -927,10 +911,7 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-
-.btn-signout:hover {
-  background: #fef2f2;
-}
+.btn-signout:hover { background: #fef2f2; }
 
 .btn-want-sell {
   height: 36px;

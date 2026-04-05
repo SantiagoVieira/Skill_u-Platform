@@ -148,7 +148,22 @@ export default function RegisterPage() {
             />
           </div>
 
+
           {error && <p className="auth-error">{error}</p>}
+
+          <div className="field-group">
+            <label className="field-label" htmlFor="reg-password">
+              Confirmar contraseña
+
+            </label>
+            <input
+              id="confirm-password"
+              className="field-input"
+              type="password"
+              placeholder="Confirma tu contraseña"
+              autoComplete="new-password"
+            />
+          </div>
 
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? "Creando cuenta…" : "Crear mi cuenta"}
