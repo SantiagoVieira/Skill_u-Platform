@@ -1,22 +1,21 @@
 import type { Metadata } from "next";
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { Sidebar }      from "@/components/dashboard/Sidebar";
 import { UserProvider } from "@/lib/UserContext";
+import { CartProvider } from "@/lib/CartContext";
 
 export const metadata: Metadata = {
   title: "Skill_u — Dashboard",
 };
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <UserProvider>
-      <div className="dash-shell">
-        <Sidebar />
-        <div className="dash-main">{children}</div>
-      </div>
+      <CartProvider>
+        <div className="dash-shell">
+          <Sidebar />
+          <div className="dash-main">{children}</div>
+        </div>
+      </CartProvider>
     </UserProvider>
   );
 }

@@ -5,13 +5,8 @@ import type { Material } from "@/types/material";
 
 // ── Topbar ────────────────────────────────────────────────
 export function Topbar({
-  title,
-  userName,
-  isSeller,
-  onSignOut,
-  onWantSell,
-  onPublishData,
-  onUploadFile,
+  title, userName, isSeller,
+  onSignOut, onWantSell, onPublishData, onUploadFile,
 }: {
   title:         string;
   userName:      string;
@@ -26,25 +21,19 @@ export function Topbar({
       <span className="topbar-title">{title}</span>
       <div className="topbar-actions">
         <span className="topbar-user">{userName}</span>
-
         {!isSeller ? (
           <button className="btn-want-sell" onClick={onWantSell}>
             ¿Quieres vender?
           </button>
         ) : (
           <>
-            <button className="btn-ghost" onClick={onPublishData}>
-              Publicar datos
-            </button>
+            <button className="btn-ghost" onClick={onPublishData}>Publicar datos</button>
             <button className="btn-orange-sm" onClick={onUploadFile}>
               <PlusIcon /> Subir archivo
             </button>
           </>
         )}
-
-        <button className="btn-signout" onClick={onSignOut}>
-          Salir
-        </button>
+        <button className="btn-signout" onClick={onSignOut}>Salir</button>
       </div>
     </header>
   );
@@ -52,10 +41,7 @@ export function Topbar({
 
 // ── StatsGrid ─────────────────────────────────────────────
 export function StatsGrid({
-  total,
-  published,
-  downloads,
-  categories,
+  total, published, downloads, categories,
 }: {
   total:      number;
   published:  number;
@@ -70,7 +56,7 @@ export function StatsGrid({
   ];
   return (
     <div className="stats-grid">
-      {cards.map((c) => (
+      {cards.map(c => (
         <div className="stat-card" key={c.label}>
           <div className="stat-card-label">{c.label}</div>
           <div className="stat-card-value">{c.value}</div>
@@ -83,12 +69,7 @@ export function StatsGrid({
 
 // ── SearchFilters ─────────────────────────────────────────
 export function SearchFilters({
-  search,
-  onSearch,
-  filterSubj,
-  onFilterSubj,
-  filterType,
-  onFilterType,
+  search, onSearch, filterSubj, onFilterSubj, filterType, onFilterType,
 }: {
   search:       string;
   onSearch:     (v: string) => void;
@@ -108,7 +89,7 @@ export function SearchFilters({
           className="search-input"
           type="text"
           value={search}
-          onChange={(e) => onSearch(e.target.value)}
+          onChange={e => onSearch(e.target.value)}
           placeholder="Buscar por título o materia..."
         />
       </div>
@@ -117,12 +98,10 @@ export function SearchFilters({
         <select
           className="filter-select"
           value={filterSubj}
-          onChange={(e) => onFilterSubj(e.target.value)}
+          onChange={e => onFilterSubj(e.target.value)}
         >
           <option value="">Todas las materias</option>
-          {SUBJECTS.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+          {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
@@ -130,7 +109,7 @@ export function SearchFilters({
         <select
           className="filter-select"
           value={filterType}
-          onChange={(e) => onFilterType(e.target.value)}
+          onChange={e => onFilterType(e.target.value)}
         >
           <option value="">Todos los tipos</option>
           <option value="PDF">PDF</option>
@@ -145,13 +124,13 @@ export function SearchFilters({
 
 // ── MaterialGrid ──────────────────────────────────────────
 export function MaterialGrid({
-  materials,
-  selectedId,
-  onSelect,
+  materials, selectedId, onSelect, myId, purchases,
 }: {
   materials:  Material[];
   selectedId: string | null;
   onSelect:   (id: string) => void;
+  myId?:      string;
+  purchases?: Set<string>;
 }) {
   if (!materials.length) {
     return (
@@ -167,8 +146,11 @@ export function MaterialGrid({
 
   return (
     <div className="materials-grid">
-      {materials.map((m) => {
-        const thumbCls = FILE_TYPE_THUMB[m.file_type ?? "PDF"] ?? "thumb-pdf";
+      {materials.map(m => {
+        const thumbCls   = FILE_TYPE_THUMB[m.file_type ?? "PDF"] ?? "thumb-pdf";
+        const isOwn      = !!myId && m.user_id === myId;
+        const isPurchased = purchases?.has(m.id) ?? false;
+
         return (
           <div
             key={m.id}
@@ -179,7 +161,26 @@ export function MaterialGrid({
               <TypeIcon type={m.file_type ?? "PDF"} />
             </div>
 
-            <span className="badge badge-subj">{m.subject ?? "—"}</span>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+              <span className="badge badge-subj">{m.subject ?? "—"}</span>
+              {isOwn && (
+                <span style={{
+                  fontSize: 10, background: "#ede9fe", color: "#5b21b6",
+                  borderRadius: 4, padding: "2px 6px", fontWeight: 600,
+                }}>
+                  Tuyo
+                </span>
+              )}
+              {!isOwn && isPurchased && (
+                <span style={{
+                  fontSize: 10, background: "#dcfce7", color: "#166534",
+                  borderRadius: 4, padding: "2px 6px", fontWeight: 600,
+                }}>
+                  Comprado
+                </span>
+              )}
+            </div>
+
             <p className="mat-title">{m.title}</p>
 
             <div className="mat-meta">
@@ -209,13 +210,9 @@ export function MaterialGrid({
 // ── Icon helpers ──────────────────────────────────────────
 function PlusIcon() {
   return (
-    <svg
-      width="13" height="13"
-      viewBox="0 0 24 24"
-      fill="none" stroke="currentColor"
-      strokeWidth="2.2" strokeLinecap="round"
-    >
-      <line x1="12" y1="5" x2="12" y2="19" />
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <line x1="12" y1="5"  x2="12" y2="19" />
       <line x1="5"  y1="12" x2="19" y2="12" />
     </svg>
   );
@@ -223,11 +220,8 @@ function PlusIcon() {
 
 function UserIcon() {
   return (
-    <svg
-      width="11" height="11" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-    >
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
