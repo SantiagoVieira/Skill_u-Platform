@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter }  from "next/navigation";
+import Link           from "next/link";
 import { supabase }   from "@/lib/supabase";
 import { useUser }    from "@/lib/UserContext";
 import { ConfigModal } from "@/components/dashboard/ConfigModal";
@@ -18,6 +19,7 @@ type Purchase = {
   author:       string;
   price:        number;
   purchased_at: string;
+  seller_id:    string;
 };
 
 export default function MisComprasPage() {
@@ -73,10 +75,10 @@ export default function MisComprasPage() {
         {/* Stats */}
         <div className="stats-grid" style={{ marginBottom: 24 }}>
           {[
-            { label: "Materiales",     value: purchases.length,                      sub: "adquiridos"     },
-            { label: "Total gastado",  value: `$${totalGastado.toLocaleString("es-CO")}`, sub: "COP"       },
-            { label: "Gratuitos",      value: purchases.filter(p => p.price === 0).length, sub: "obtenidos" },
-            { label: "De pago",        value: purchases.filter(p => p.price > 0).length,  sub: "comprados"  },
+            { label: "Materiales",    value: purchases.length,                            sub: "adquiridos" },
+            { label: "Total gastado", value: `$${totalGastado.toLocaleString("es-CO")}`,  sub: "COP"        },
+            { label: "Gratuitos",     value: purchases.filter(p => p.price === 0).length, sub: "obtenidos"  },
+            { label: "De pago",       value: purchases.filter(p => p.price > 0).length,   sub: "comprados"  },
           ].map(c => (
             <div className="stat-card" key={c.label}>
               <div className="stat-card-label">{c.label}</div>
@@ -126,7 +128,6 @@ export default function MisComprasPage() {
               </div>
             </div>
 
-            {/* Visor según tipo */}
             {viewing.file_type === "PDF" ? (
               <iframe
                 src={viewing.file_url}
@@ -150,7 +151,6 @@ export default function MisComprasPage() {
                 />
               </div>
             ) : (
-              // DOC u otros — no se pueden previsualizar, solo descargar
               <div style={{
                 padding: 40, textAlign: "center",
                 background: "var(--gray-50)", color: "var(--gray-500)",
@@ -221,7 +221,6 @@ export default function MisComprasPage() {
   );
 }
 
-// ── Fila de compra ────────────────────────────────────────
 function PurchaseRow({
   purchase: p,
   isViewing,
@@ -263,7 +262,13 @@ function PurchaseRow({
           {p.title}
         </p>
         <p style={{ fontSize: 11, color: "var(--gray-500)", margin: "3px 0 0" }}>
-          {p.subject ?? "—"} · {p.author}
+          {p.subject ?? "—"} ·{" "}
+          <Link
+            href={`/vendedor/${p.seller_id}`}
+            style={{ color: "var(--orange)", fontWeight: 600, textDecoration: "none" }}
+          >
+            {p.author}
+          </Link>
           {" · "}
           {new Date(p.purchased_at).toLocaleDateString("es-CO")}
         </p>
