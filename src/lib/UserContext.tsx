@@ -9,6 +9,7 @@ type Profile = {
   last_name:  string;
   program:    string;
   is_seller:  boolean;
+  is_admin:   boolean;  // ← agregado
 };
 
 type UserContextType = {
@@ -35,7 +36,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const { data } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, program, is_seller")
+      .select("id, first_name, last_name, program, is_seller, is_admin") // ← agregado
       .eq("id", session.user.id)
       .maybeSingle();
 

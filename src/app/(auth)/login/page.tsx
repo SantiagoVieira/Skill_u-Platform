@@ -20,7 +20,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (searchParams.get("registered") === "1") {
       setRegistered(true);
-      // Limpiar el parámetro de la URL sin recargar
       window.history.replaceState({}, "", "/login");
     }
   }, [searchParams]);
@@ -30,7 +29,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setError(
@@ -40,6 +39,19 @@ export default function LoginPage() {
       );
       setLoading(false);
       return;
+    }
+
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      if (profile?.is_admin) {
+        router.push("/admin");
+        return;
+      }
     }
 
     router.push("/materiales");
@@ -60,7 +72,6 @@ export default function LoginPage() {
         <h1 className="auth-form-title">Bienvenido de vuelta</h1>
         <p className="auth-form-sub">Ingresa tu cuenta para continuar</p>
 
-        {/* Banner de registro exitoso */}
         {registered && (
           <div style={{
             display: "flex", alignItems: "center", gap: 10,
