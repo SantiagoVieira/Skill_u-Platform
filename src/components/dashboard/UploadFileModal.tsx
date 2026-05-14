@@ -20,15 +20,12 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
 
-  // Campos nueva publicación
   const [title,   setTitle]   = useState("");
   const [desc,    setDesc]    = useState("");
   const [subject, setSubject] = useState<string>(SUBJECTS[0]);
   const [price,   setPrice]   = useState("0");
 
-  useEffect(() => {
-    loadMyPubs();
-  }, []);
+  useEffect(() => { loadMyPubs(); }, []);
 
   async function loadMyPubs() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -75,12 +72,13 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
       const { data: newMat, error: insertErr } = await supabase
         .from("materials")
         .insert({
-          user_id:     session.user.id,
-          title:       title.trim(),
-          description: desc.trim(),
+          user_id:         session.user.id,
+          title:           title.trim(),
+          description:     desc.trim(),
           subject,
-          price:       parsedPrice,
-          is_visible:  false,
+          price:           parsedPrice,
+          is_visible:      false,
+          curation_status: "pending",
         })
         .select("id")
         .single();
@@ -89,7 +87,7 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
       materialId = newMat.id;
     }
 
-    // Sanitizar nombre del archivo
+    // Sanitizar nombre
     const safeName = fileObj.name
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -99,7 +97,7 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
     const path = `${session.user.id}/${Date.now()}_${safeName}`;
     const size = (fileObj.size / 1_048_576).toFixed(1) + " MB";
 
-    // Subir archivo
+    // Subir archivo al storage
     const { error: upErr } = await supabase.storage
       .from("materials")
       .upload(path, fileObj);
@@ -108,17 +106,23 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
 
     const { data: urlData } = supabase.storage.from("materials").getPublicUrl(path);
 
-    // Actualizar material
+    const fileType = ["PDF", "DOC", "DOCX"].includes(ext)
+      ? ext === "PDF" ? "PDF" : "DOC"
+      : ["JPG", "PNG", "WEBP"].includes(ext) ? "IMG"
+      : ["MP4", "MOV"].includes(ext) ? "VID" : "PDF";
+
+    // Actualizar material con archivo — is_visible: false hasta aprobación
     const { error: updateErr } = await supabase
       .from("materials")
       .update({
-        file_url:  urlData.publicUrl,
-        file_type: ["PDF", "DOC", "DOCX"].includes(ext)
-          ? ext === "PDF" ? "PDF" : "DOC"
-          : ["JPG", "PNG", "WEBP"].includes(ext) ? "IMG"
-          : ["MP4", "MOV"].includes(ext) ? "VID" : "PDF",
-        file_size:  size,
-        is_visible: true,
+        file_url:        urlData.publicUrl,
+        file_type:       fileType,
+        file_size:       size,
+        is_visible:      false,       // el admin decide si se ve
+        curation_status: "pending",   // vuelve a revisión
+        curation_notes:  null,
+        curated_at:      null,
+        curated_by:      null,
       })
       .eq("id", materialId);
 
@@ -127,7 +131,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
     onUploaded();
   }
 
-  // Si viene preselectedId, buscar el título para mostrarlo
   const preselectedTitle = myPubs.find(p => p.id === preselectedId)?.title;
 
   return (
@@ -140,7 +143,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
 
         <div className="modal-body">
 
-          {/* ── Si viene preseleccionado, mostrar a qué publicación va ── */}
           {preselectedId ? (
             <div style={{
               background: "var(--gray-50)", border: "1px solid var(--gray-200)",
@@ -153,12 +155,10 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
                 <polyline points="13 2 13 9 20 9" />
               </svg>
               <span style={{ fontSize: 12, color: "var(--gray-700)" }}>
-                Subiendo archivo para:{" "}
-                <strong>{preselectedTitle ?? "Cargando…"}</strong>
+                Subiendo archivo para: <strong>{preselectedTitle ?? "Cargando…"}</strong>
               </span>
             </div>
           ) : (
-            /* ── Selector de modo ── */
             <div>
               <label className="field-label" style={{ marginBottom: 8 }}>
                 ¿A qué publicación corresponde?
@@ -178,7 +178,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
                 </button>
               </div>
 
-              {/* ── Modo: seleccionar existente ── */}
               {mode === "select" && (
                 myPubs.length === 0
                   ? <p style={{ fontSize: 12, color: "var(--gray-400)" }}>
@@ -198,7 +197,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
                     </div>
               )}
 
-              {/* ── Modo: nueva publicación ── */}
               {mode === "new" && (
                 <div style={{
                   background: "var(--gray-50)", border: "1px solid var(--gray-200)",
@@ -214,7 +212,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
                       placeholder="Ej: Apuntes Cálculo Diferencial 2024-1"
                     />
                   </div>
-
                   <div className="field-group" style={{ margin: 0 }}>
                     <label className="field-label">Descripción</label>
                     <textarea
@@ -225,7 +222,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
                       placeholder="Describe brevemente el contenido..."
                     />
                   </div>
-
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div className="field-group" style={{ margin: 0 }}>
                       <label className="field-label">Materia</label>
@@ -241,7 +237,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
                         </select>
                       </div>
                     </div>
-
                     <div className="field-group" style={{ margin: 0 }}>
                       <label className="field-label">
                         Precio (COP)
@@ -267,7 +262,6 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
             </div>
           )}
 
-          {/* ── Drop zone ── */}
           <div
             className="drop-zone"
             onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("over"); }}
@@ -308,6 +302,19 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
             </div>
           )}
 
+          {/* Aviso de moderación */}
+          <div style={{
+            background: "#fef3c7", border: "1px solid #fde68a",
+            borderRadius: 8, padding: "10px 12px",
+            display: "flex", alignItems: "flex-start", gap: 8,
+          }}>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>⏳</span>
+            <p style={{ fontSize: 11, color: "#92400e", margin: 0, lineHeight: 1.5 }}>
+              Tu archivo será revisado por un administrador antes de aparecer en la plataforma.
+              Recibirás una notificación con el resultado.
+            </p>
+          </div>
+
           {error && <p className="auth-error">{error}</p>}
         </div>
 
@@ -318,7 +325,7 @@ export function UploadFileModal({ onClose, onUploaded, preselectedId }: Props) {
             onClick={handleUpload}
             disabled={loading}
           >
-            {loading ? "Publicando…" : "Publicar archivo →"}
+            {loading ? "Enviando a revisión…" : "Enviar a revisión →"}
           </button>
         </div>
       </div>

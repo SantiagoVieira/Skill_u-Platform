@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter }  from "next/navigation";
-import { supabase }   from "@/lib/supabase";
-import { useUser }    from "@/lib/UserContext";
-import { ConfigModal }      from "@/components/dashboard/ConfigModal";
-import { Toast }            from "@/components/ui/Toast";
+import { useRouter }       from "next/navigation";
+import { supabase }        from "@/lib/supabase";
+import { useUser }         from "@/lib/UserContext";
+import { ConfigModal }     from "@/components/dashboard/ConfigModal";
+import { Toast }           from "@/components/ui/Toast";
 import { RateSellerModal } from "@/components/reputation/Ratesellermodal";
-
+import { ReportModal }     from "@/components/dashboard/ReportModal";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 
 type Purchase = {
   purchase_id:  string;
@@ -27,14 +28,15 @@ export default function MisComprasPage() {
   const router = useRouter();
   const { profile, signOut, loading: profileLoading } = useUser();
 
-  const [purchases,    setPurchases]    = useState<Purchase[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [viewing,      setViewing]      = useState<Purchase | null>(null);
-  const [showConfig,   setShowConfig]   = useState(false);
-  const [toast,        setToast]        = useState("");
-  const [rateTarget,   setRateTarget]   = useState<{ sellerId: string; sellerName: string } | null>(null);
-  // Track which seller_ids the current user has already reviewed
-  const [reviewedSellers, setReviewedSellers] = useState<Set<string>>(new Set());
+  const [purchases,        setPurchases]        = useState<Purchase[]>([]);
+  const [loading,          setLoading]          = useState(true);
+  const [viewing,          setViewing]          = useState<Purchase | null>(null);
+  const [showConfig,       setShowConfig]       = useState(false);
+  const [toast,            setToast]            = useState("");
+  const [rateTarget,       setRateTarget]       = useState<{ sellerId: string; sellerName: string } | null>(null);
+  const [reportTarget,     setReportTarget]     = useState<Purchase | null>(null);
+  const [reviewedSellers,  setReviewedSellers]  = useState<Set<string>>(new Set());
+  const [reportedMaterials, setReportedMaterials] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const handler = () => setShowConfig(true);
@@ -47,13 +49,12 @@ export default function MisComprasPage() {
     if (!profile) { router.replace("/login"); return; }
     loadPurchases();
     loadReviewedSellers();
+    loadReportedMaterials();
   }, [profileLoading, profile]);
 
   async function loadPurchases() {
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_my_purchases", {
-      buyer_id: profile!.id,
-    });
+    const { data, error } = await supabase.rpc("get_my_purchases", { buyer_id: profile!.id });
     if (error) console.error(error);
     if (data) setPurchases(data as Purchase[]);
     setLoading(false);
@@ -68,6 +69,15 @@ export default function MisComprasPage() {
     if (data) setReviewedSellers(new Set(data.map((r: any) => r.seller_id)));
   }
 
+  async function loadReportedMaterials() {
+    if (!profile) return;
+    const { data } = await supabase
+      .from("reports")
+      .select("material_id")
+      .eq("reporter_id", profile.id);
+    if (data) setReportedMaterials(new Set(data.map((r: any) => r.material_id)));
+  }
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 3200);
@@ -80,6 +90,7 @@ export default function MisComprasPage() {
       <header className="topbar">
         <span className="topbar-title">Mis compras</span>
         <div className="topbar-actions">
+          <NotificationBell />
           <button className="btn-signout" onClick={signOut}>Salir</button>
         </div>
       </header>
@@ -102,7 +113,7 @@ export default function MisComprasPage() {
           ))}
         </div>
 
-        {/* Visor de documento */}
+        {/* Visor */}
         {viewing && (
           <div style={{
             background: "var(--white)", border: "1px solid var(--gray-200)",
@@ -116,32 +127,16 @@ export default function MisComprasPage() {
                 {viewing.title}
               </span>
               <div style={{ display: "flex", gap: 8 }}>
-                <a
-                  href={viewing.file_url}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    fontSize: 12, fontWeight: 600, color: "white",
-                    background: "var(--orange)", borderRadius: 6,
-                    padding: "5px 12px", textDecoration: "none",
-                  }}
-                >
+                <a href={viewing.file_url} download target="_blank" rel="noreferrer"
+                  style={{ fontSize: 12, fontWeight: 600, color: "white", background: "var(--orange)", borderRadius: 6, padding: "5px 12px", textDecoration: "none" }}>
                   Descargar
                 </a>
-                <button
-                  onClick={() => setViewing(null)}
-                  style={{
-                    background: "var(--gray-100)", border: "1px solid var(--gray-200)",
-                    borderRadius: 6, padding: "5px 10px", cursor: "pointer",
-                    fontSize: 12, color: "var(--gray-600)",
-                  }}
-                >
+                <button onClick={() => setViewing(null)}
+                  style={{ background: "var(--gray-100)", border: "1px solid var(--gray-200)", borderRadius: 6, padding: "5px 10px", cursor: "pointer", fontSize: 12, color: "var(--gray-600)" }}>
                   Cerrar visor
                 </button>
               </div>
             </div>
-
             {viewing.file_type === "PDF" ? (
               <iframe src={viewing.file_url} style={{ width: "100%", height: 600, border: "none" }} title={viewing.title} />
             ) : viewing.file_type === "IMG" ? (
@@ -175,8 +170,7 @@ export default function MisComprasPage() {
         {!loading && purchases.length === 0 && (
           <div className="empty-state">
             <svg viewBox="0 0 24 24">
-              <circle cx="9"  cy="21" r="1" />
-              <circle cx="20" cy="21" r="1" />
+              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
             </svg>
             Aún no has comprado ningún material
@@ -190,14 +184,15 @@ export default function MisComprasPage() {
               purchase={p}
               isViewing={viewing?.purchase_id === p.purchase_id}
               hasReviewed={reviewedSellers.has(p.seller_id)}
+              hasReported={reportedMaterials.has(p.material_id)}
               onView={() => setViewing(prev => prev?.purchase_id === p.purchase_id ? null : p)}
               onRate={() => setRateTarget({ sellerId: p.seller_id, sellerName: p.author })}
+              onReport={() => setReportTarget(p)}
             />
           ))}
         </div>
       </div>
 
-      {/* Modal calificar vendedor */}
       {rateTarget && (
         <RateSellerModal
           sellerId={rateTarget.sellerId}
@@ -206,7 +201,21 @@ export default function MisComprasPage() {
           onReviewed={() => {
             setRateTarget(null);
             loadReviewedSellers();
-            showToast("¡Reseña publicada! Gracias por tu opinión.");
+            showToast("¡Reseña publicada!");
+          }}
+        />
+      )}
+
+      {reportTarget && (
+        <ReportModal
+          materialId={reportTarget.material_id}
+          materialTitle={reportTarget.title}
+          sellerId={reportTarget.seller_id}
+          onClose={() => setReportTarget(null)}
+          onReported={() => {
+            setReportTarget(null);
+            loadReportedMaterials();
+            showToast("Reporte enviado. Lo revisaremos pronto.");
           }}
         />
       )}
@@ -218,80 +227,50 @@ export default function MisComprasPage() {
 }
 
 function PurchaseRow({
-  purchase: p,
-  isViewing,
-  hasReviewed,
-  onView,
-  onRate,
+  purchase: p, isViewing, hasReviewed, hasReported, onView, onRate, onReport,
 }: {
   purchase:    Purchase;
   isViewing:   boolean;
   hasReviewed: boolean;
+  hasReported: boolean;
   onView:      () => void;
   onRate:      () => void;
+  onReport:    () => void;
 }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 14,
-      background: "var(--white)", border: `1px solid ${isViewing ? "var(--orange)" : "var(--gray-200)"}`,
-      borderRadius: 10, padding: "12px 16px",
-      transition: "border-color 0.15s",
+      background: "var(--white)",
+      border: `1px solid ${isViewing ? "var(--orange)" : "var(--gray-200)"}`,
+      borderRadius: 10, padding: "12px 16px", transition: "border-color 0.15s",
     }}>
-      {/* Icono tipo */}
       <div style={{
         width: 40, height: 40, borderRadius: 8, flexShrink: 0,
-        background: p.file_type === "PDF" ? "#fff1e6"
-          : p.file_type === "IMG" ? "#e0f2fe"
-          : p.file_type === "VID" ? "#fce7f3"
-          : "#f0fdf4",
+        background: p.file_type === "PDF" ? "#fff1e6" : p.file_type === "IMG" ? "#e0f2fe" : p.file_type === "VID" ? "#fce7f3" : "#f0fdf4",
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: p.file_type === "PDF" ? "var(--orange)"
-          : p.file_type === "IMG" ? "#0284c7"
-          : p.file_type === "VID" ? "#db2777"
-          : "#16a34a",
+        color: p.file_type === "PDF" ? "var(--orange)" : p.file_type === "IMG" ? "#0284c7" : p.file_type === "VID" ? "#db2777" : "#16a34a",
       }}>
         <FileTypeIcon type={p.file_type} />
       </div>
 
-      {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          fontSize: 13, fontWeight: 600, color: "var(--gray-900)", margin: 0,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-900)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {p.title}
         </p>
         <p style={{ fontSize: 11, color: "var(--gray-500)", margin: "3px 0 0" }}>
-          {p.subject ?? "—"} · <strong>{p.author}</strong>
-          {" · "}
-          {new Date(p.purchased_at).toLocaleDateString("es-CO")}
+          {p.subject ?? "—"} · <strong>{p.author}</strong> · {new Date(p.purchased_at).toLocaleDateString("es-CO")}
         </p>
       </div>
 
-      {/* Precio */}
-      <span style={{
-        fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-        color: p.price === 0 ? "#16a34a" : "var(--orange)",
-      }}>
+      <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", color: p.price === 0 ? "#16a34a" : "var(--orange)" }}>
         {p.price === 0 ? "Gratis" : `$${p.price.toLocaleString("es-CO")}`}
       </span>
 
-      {/* Acciones */}
       <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
-
-        {/* Botón calificar vendedor */}
+        {/* Calificar */}
         {!hasReviewed ? (
-          <button
-            onClick={onRate}
-            title="Calificar al vendedor"
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              fontSize: 11, fontWeight: 600, padding: "5px 10px",
-              borderRadius: 6, cursor: "pointer",
-              border: "1px solid #f59e0b",
-              background: "#fff8e1", color: "#92400e",
-              transition: "background 0.15s", whiteSpace: "nowrap",
-            }}
+          <button onClick={onRate}
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer", border: "1px solid #f59e0b", background: "#fff8e1", color: "#92400e", whiteSpace: "nowrap" }}
             onMouseEnter={e => e.currentTarget.style.background = "#fef3c7"}
             onMouseLeave={e => e.currentTarget.style.background = "#fff8e1"}
           >
@@ -301,51 +280,44 @@ function PurchaseRow({
             Calificar
           </button>
         ) : (
-          <span
-            onClick={onRate}
-            title="Ver reseñas del vendedor"
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              fontSize: 11, fontWeight: 600, padding: "5px 10px",
-              borderRadius: 6, cursor: "pointer",
-              border: "1px solid #86efac",
-              background: "#f0fdf4", color: "#16a34a",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-              stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round">
+          <span onClick={onRate}
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer", border: "1px solid #86efac", background: "#f0fdf4", color: "#16a34a", whiteSpace: "nowrap" }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             Calificado
           </span>
         )}
 
-        <button
-          onClick={onView}
-          style={{
-            fontSize: 11, fontWeight: 600, padding: "5px 12px",
-            borderRadius: 6, cursor: "pointer", border: "1px solid",
-            borderColor: isViewing ? "var(--orange)" : "var(--gray-200)",
-            background:  isViewing ? "#fff1e6"       : "var(--gray-50)",
-            color:       isViewing ? "var(--orange)"  : "var(--gray-600)",
-          }}
-        >
+        {/* Reportar */}
+        {!hasReported ? (
+          <button onClick={onReport}
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 6, cursor: "pointer", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", whiteSpace: "nowrap" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#fee2e2"}
+            onMouseLeave={e => e.currentTarget.style.background = "#fef2f2"}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            Reportar
+          </button>
+        ) : (
+          <span style={{ fontSize: 11, color: "var(--gray-400)", padding: "5px 10px", whiteSpace: "nowrap" }}>
+            Reportado
+          </span>
+        )}
+
+        {/* Ver */}
+        <button onClick={onView}
+          style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 6, cursor: "pointer", border: "1px solid", borderColor: isViewing ? "var(--orange)" : "var(--gray-200)", background: isViewing ? "#fff1e6" : "var(--gray-50)", color: isViewing ? "var(--orange)" : "var(--gray-600)" }}>
           {isViewing ? "Cerrar" : "Ver"}
         </button>
-        <a
-          href={p.file_url}
-          download
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            fontSize: 11, fontWeight: 600, padding: "5px 12px",
-            borderRadius: 6, cursor: "pointer",
-            border: "1px solid var(--orange)",
-            background: "var(--orange)", color: "white",
-            textDecoration: "none",
-          }}
-        >
+
+        {/* Descargar */}
+        <a href={p.file_url} download target="_blank" rel="noreferrer"
+          style={{ fontSize: 11, fontWeight: 600, padding: "5px 12px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--orange)", background: "var(--orange)", color: "white", textDecoration: "none" }}>
           Descargar
         </a>
       </div>
@@ -354,27 +326,7 @@ function PurchaseRow({
 }
 
 function FileTypeIcon({ type }: { type: string }) {
-  if (type === "IMG") {
-    return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-      </svg>
-    );
-  }
-  if (type === "VID") {
-    return (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <polygon points="23 7 16 12 23 17 23 7" />
-        <rect x="1" y="5" width="15" height="14" rx="2" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-      <polyline points="13 2 13 9 20 9" />
-    </svg>
-  );
+  if (type === "IMG") return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+  if (type === "VID") return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>;
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>;
 }

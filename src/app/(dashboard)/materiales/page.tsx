@@ -17,6 +17,7 @@ import { CartDrawer }          from "@/components/dashboard/CartDrawer";
 import { CheckoutModal }       from "@/components/dashboard/CheckoutModal";
 import { Toast }               from "@/components/ui/Toast";
 import type { Material }       from "@/types/material";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 
 export default function MaterialesPage() {
   const router = useRouter();
@@ -60,6 +61,7 @@ export default function MaterialesPage() {
         ...m,
         author: m.author ?? "Anónimo",
       })));
+      console.log("primer material:", data[0]);
     }
     setLoading(false);
   }
@@ -106,7 +108,7 @@ export default function MaterialesPage() {
               </button>
             </>
           )}
-
+<NotificationBell />
           <button
             onClick={() => setShowCart(true)}
             style={{

@@ -7,6 +7,7 @@ import { useUser }   from "@/lib/UserContext";
 import { ConfigModal }        from "@/components/dashboard/ConfigModal";
 import { Toast }              from "@/components/ui/Toast";
 import { MyReputationModal } from "@/components/reputation/Myreputationmodal";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 
 
 type Sale = {
@@ -85,6 +86,7 @@ export default function MisVentasPage() {
             </svg>
             Mi reputación
           </button>
+          <NotificationBell />
           <button className="btn-signout" onClick={signOut}>Salir</button>
         </div>
       </header>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { loadStripe }          from "@stripe/stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements, PaymentElement, useStripe, useElements,
 } from "@stripe/react-stripe-js";
@@ -16,6 +16,61 @@ interface Props {
   onPaid:  () => void;
 }
 
+// ── Helper: insertar notificación via RPC (evita RLS) ─────
+async function insertNotification(
+  userId:  string,
+  title:   string,
+  message: string,
+  type:    string = "info"
+) {
+  const { error } = await supabase.rpc("insert_notification", {
+    p_user_id: userId,
+    p_title:   title,
+    p_message: message,
+    p_type:    type,
+  });
+  if (error) console.error("Error insertando notificación:", error);
+}
+
+// ── Helper: notificar vendedores sin queries extra ─────────
+async function notificarVendedores(
+  items: { material: { id: string; title: string; price: number; user_id: string } }[],
+  tipo:  "venta" | "descarga"
+) {
+  const vendedorMap = new Map<string, { materiales: string[]; total: number }>();
+
+  for (const item of items) {
+    const vid = item.material.user_id;
+    if (!vid) continue;
+    if (!vendedorMap.has(vid)) vendedorMap.set(vid, { materiales: [], total: 0 });
+    vendedorMap.get(vid)!.materiales.push(item.material.title);
+    vendedorMap.get(vid)!.total += item.material.price ?? 0;
+  }
+
+  for (const [vid, info] of vendedorMap) {
+    if (tipo === "venta") {
+      await insertNotification(
+        vid,
+        "💰 ¡Nueva venta!",
+        info.materiales.length === 1
+          ? `Vendiste "${info.materiales[0]}" por $${info.total.toLocaleString("es-CO")} COP.`
+          : `Vendiste ${info.materiales.length} materiales por $${info.total.toLocaleString("es-CO")} COP en total.`,
+        "success"
+      );
+    } else {
+      await insertNotification(
+        vid,
+        "📦 Material descargado",
+        info.materiales.length === 1
+          ? `"${info.materiales[0]}" fue descargado gratuitamente.`
+          : `${info.materiales.length} de tus materiales fueron descargados gratuitamente.`,
+        "info"
+      );
+    }
+  }
+}
+
+// ── CheckoutModal ─────────────────────────────────────────
 export function CheckoutModal({ onClose, onPaid }: Props) {
   const { items, total } = useCart();
   const { profile }      = useUser();
@@ -47,7 +102,6 @@ export function CheckoutModal({ onClose, onPaid }: Props) {
       );
 
       setOrderId(order.id);
-
       if (total === 0) { setLoadingSecret(false); return; }
 
       const res  = await fetch("/api/create-payment-intent", {
@@ -68,37 +122,27 @@ export function CheckoutModal({ onClose, onPaid }: Props) {
     <div
       onClick={e => e.target === e.currentTarget && onClose()}
       style={{
-        position: "fixed", inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "20px 16px",
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        zIndex: 100, display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "20px 16px",
       }}
     >
       <div style={{
         background: "var(--white)", borderRadius: 12,
-        width: "100%", maxWidth: 480,
-        maxHeight: "90vh",
+        width: "100%", maxWidth: 480, maxHeight: "90vh",
         display: "flex", flexDirection: "column",
         boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
       }}>
         {/* Header fijo */}
         <div style={{
-          padding: "18px 24px",
-          borderBottom: "1px solid var(--gray-200)",
+          padding: "18px 24px", borderBottom: "1px solid var(--gray-200)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
           <span style={{ fontSize: 16, fontWeight: 700, color: "var(--gray-900)" }}>
             Finalizar compra
           </span>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "var(--gray-500)", fontSize: 18, lineHeight: 1,
-            }}
-          >
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gray-500)", fontSize: 18, lineHeight: 1 }}>
             ✕
           </button>
         </div>
@@ -113,9 +157,7 @@ export function CheckoutModal({ onClose, onPaid }: Props) {
                 fontSize: 13, padding: "6px 0",
                 borderBottom: "1px solid var(--gray-100)",
               }}>
-                <span style={{ color: "var(--gray-700)", flex: 1, marginRight: 12 }}>
-                  {m.title}
-                </span>
+                <span style={{ color: "var(--gray-700)", flex: 1, marginRight: 12 }}>{m.title}</span>
                 <span style={{ fontWeight: 600, color: "var(--gray-900)", whiteSpace: "nowrap" }}>
                   {m.price === 0 ? "Gratis" : `$${m.price.toLocaleString("es-CO")}`}
                 </span>
@@ -123,25 +165,17 @@ export function CheckoutModal({ onClose, onPaid }: Props) {
             ))}
             <div style={{
               display: "flex", justifyContent: "space-between",
-              fontSize: 15, fontWeight: 700, marginTop: 12,
-              color: "var(--gray-900)",
+              fontSize: 15, fontWeight: 700, marginTop: 12, color: "var(--gray-900)",
             }}>
               <span>Total</span>
-              <span style={{ color: "var(--orange)" }}>
-                ${total.toLocaleString("es-CO")} COP
-              </span>
+              <span style={{ color: "var(--orange)" }}>${total.toLocaleString("es-CO")} COP</span>
             </div>
           </div>
 
-          {error && (
-            <p style={{ fontSize: 12, color: "#ef4444", marginBottom: 12 }}>{error}</p>
-          )}
+          {error && <p style={{ fontSize: 12, color: "#ef4444", marginBottom: 12 }}>{error}</p>}
 
           {loadingSecret ? (
-            <p style={{
-              fontSize: 13, color: "var(--gray-400)",
-              textAlign: "center", padding: "20px 0",
-            }}>
+            <p style={{ fontSize: 13, color: "var(--gray-400)", textAlign: "center", padding: "20px 0" }}>
               Preparando pago…
             </p>
           ) : total === 0 ? (
@@ -166,6 +200,7 @@ function FreeCheckout({ orderId, onPaid }: { orderId: string; onPaid: () => void
   async function handleConfirm() {
     if (!profile) return;
     setLoading(true);
+
     await supabase.from("orders").update({ status: "paid" }).eq("id", orderId);
     await supabase.from("purchases").insert(
       items.map(i => ({
@@ -174,6 +209,20 @@ function FreeCheckout({ orderId, onPaid }: { orderId: string; onPaid: () => void
         order_id:    orderId,
       }))
     );
+
+    // Notificación al comprador
+    await insertNotification(
+      profile.id,
+      "🎉 Material obtenido",
+      items.length === 1
+        ? `Obtuviste "${items[0].material.title}" de forma gratuita. Ya puedes verlo en Mis compras.`
+        : `Obtuviste ${items.length} materiales de forma gratuita. Ya puedes verlos en Mis compras.`,
+      "success"
+    );
+
+    // Notificación a vendedores
+    await notificarVendedores(items, "descarga");
+
     clear();
     onPaid();
   }
@@ -197,10 +246,10 @@ function FreeCheckout({ orderId, onPaid }: { orderId: string; onPaid: () => void
 
 // ── Formulario Stripe ─────────────────────────────────────
 function StripeForm({ orderId, onPaid }: { orderId: string; onPaid: () => void }) {
-  const stripe         = useStripe();
-  const elements       = useElements();
+  const stripe           = useStripe();
+  const elements         = useElements();
   const { items, clear } = useCart();
-  const { profile }    = useUser();
+  const { profile }      = useUser();
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
@@ -230,6 +279,22 @@ function StripeForm({ orderId, onPaid }: { orderId: string; onPaid: () => void }
           order_id:    orderId,
         }))
       );
+
+      const totalCompra = items.reduce((s, i) => s + (i.material.price ?? 0), 0);
+
+      // Notificación al comprador
+      await insertNotification(
+        profile.id,
+        "🎉 ¡Compra exitosa!",
+        items.length === 1
+          ? `Compraste "${items[0].material.title}" por $${items[0].material.price.toLocaleString("es-CO")} COP. Ya puedes verlo en Mis compras.`
+          : `Compraste ${items.length} materiales por $${totalCompra.toLocaleString("es-CO")} COP en total. Ya puedes verlos en Mis compras.`,
+        "success"
+      );
+
+      // Notificación a vendedores
+      await notificarVendedores(items, "venta");
+
       clear();
       onPaid();
     }
@@ -238,9 +303,7 @@ function StripeForm({ orderId, onPaid }: { orderId: string; onPaid: () => void }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <PaymentElement />
-      {error && (
-        <p style={{ fontSize: 12, color: "#ef4444" }}>{error}</p>
-      )}
+      {error && <p style={{ fontSize: 12, color: "#ef4444" }}>{error}</p>}
       <button
         onClick={handlePay}
         disabled={loading || !stripe}
